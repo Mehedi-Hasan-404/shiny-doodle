@@ -1,4 +1,4 @@
-name: Cricket Matches
+name: Daily Cricket Matches
 
 on:
   schedule:
@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install espncricinfo
+          pip install python-espncricinfo
           python -m playwright install webkit
 
       - name: Write script from secret
@@ -45,12 +45,32 @@ jobs:
           path: matches.json
           retention-days: 7
 
+      - name: Merge into cumulative matches.json
+        run: |
+          python - <<'EOF'
+          import json
+          import os
+
+          new_matches = json.load(open("matches.json"))
+
+          existing = []
+          if os.path.exists("all-matches.json"):
+              with open("all-matches.json") as f:
+                  existing = json.load(f)
+
+          by_id = {m["match_id"]: m for m in existing}
+          for m in new_matches:
+              by_id[m["match_id"]] = m
+
+          merged = list(by_id.values())
+          with open("all-matches.json", "w") as f:
+              json.dump(merged, f, indent=2)
+          EOF
+
       - name: Commit and push results (optional)
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          mkdir -p data
-          cp matches.json data/matches-$(date +%Y-%m-%d).json
-          git add data/matches-*.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update daily matches for $(date +%Y-%m-%d)" && git push)
+          git add all-matches.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update matches for $(date +%Y-%m-%d)" && git push)
         continue-on-error: true
