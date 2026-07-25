@@ -24,7 +24,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install python-espncricinfo
+          pip install git+https://github.com/outside-edge/python-espncricinfo.git
+          python -m playwright install webkit --with-deps
 
       - name: Write script from secret
         run: |
