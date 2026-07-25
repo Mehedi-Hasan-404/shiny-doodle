@@ -1,0 +1,56 @@
+name: Cricket Matches
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-matches:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m playwright install webkit
+
+      - name: Write script from secret
+        run: |
+          mkdir -p scripts
+          echo "${{ secrets.FETCH_SCRIPT_B64 }}" | base64 -d > scripts/get_todays_matches.py
+
+      - name: Fetch today's matches
+        id: fetch
+        run: |
+          python scripts/get_todays_matches.py > matches.json
+          cat matches.json
+
+      - name: Upload matches as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: todays-matches
+          path: matches.json
+          retention-days: 7
+
+      - name: Commit and push results (optional)
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          mkdir -p data
+          cp matches.json data/matches-$(date +%Y-%m-%d).json
+          git add data/matches-*.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update daily matches for $(date +%Y-%m-%d)" && git push)
+        continue-on-error: true
